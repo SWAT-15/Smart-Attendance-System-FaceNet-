@@ -1,0 +1,108 @@
+# ================================================================
+#  Smart Attendance System — Docker Compose
+#
+#  Uses YOUR cloud services (Supabase + Upstash) — no local DB/Redis.
+#
+#  Services:
+#   1. ml-service  — Python FastAPI + FaceNet (face embedding & verify)
+#   2. backend     — Spring Boot API (connects to Supabase + Upstash)
+#   3. frontend    — Next.js (Student + Teacher + Admin portals)
+#
+#  Usage:
+#   docker-compose up --build        # First run
+#   docker-compose up -d             # Background
+#   docker-compose down              # Stop all
+#   docker-compose logs -f backend   # Tail backend logs
+#
+#  Access:
+#   Frontend   → http://localhost:3000
+#   Backend    → http://localhost:8080/api/swagger-ui.html
+#   ML Service → http://localhost:8001/docs
+# ================================================================
+
+version: '3.9'
+
+services:
+
+  # ── 1. FaceNet ML Microservice (Python FastAPI) ─────────────────
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: attendance_ml_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      PORT: 8001
+    volumes:
+      - facenet_cache:/root/.cache/torch   # Cache PyTorch weights between restarts
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - attendance-net
+
+  # ── 2. Spring Boot Backend API ─────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: attendance_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env                           # Reads your Supabase + Upstash credentials
+    environment:
+      FACENET_URL: http://ml-service:8001
+      FRONTEND_URL: http://localhost:3000
+      PORT: 8080
+    depends_on:
+      ml-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    networks:
+      - attendance-net
+
+  # ── 3. Next.js Frontend ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080/api
+        NEXT_PUBLIC_WS_URL: ws://localhost:8080/api/ws
+    container_name: attendance_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_WS_URL: ws://localhost:8080/api/ws
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - attendance-net
+
+# ── Networks ────────────────────────────────────────────────────────
+networks:
+  attendance-net:
+    driver: bridge
+
+# ── Volumes ─────────────────────────────────────────────────────────
+volumes:
+  facenet_cache:
+    name: attendance_facenet_cache    # Caches PyTorch model weights between restarts

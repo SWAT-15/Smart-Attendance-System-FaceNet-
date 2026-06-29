@@ -1,0 +1,48 @@
+# ── Environment Secrets (NEVER COMMIT) ─────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.local
+
+# ── OS / System ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ── Next.js / Frontend ──────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# ── Spring Boot / Backend ───────────────────────────────────────────────
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.class
+backend/.idea/
+backend/*.iml
+backend/.vscode/
+backend/logs/
+
+# ── Python / ML-service ─────────────────────────────────────────────────
+ml-service/__pycache__/
+ml-service/*.py[cod]
+ml-service/*$py.class
+ml-service/.venv/
+ml-service/venv/
+ml-service/ENV/
+ml-service/env/
+
+# ── Root / Global ───────────────────────────────────────────────────────
+node_modules/
+.vscode/
+.idea/
+*.log

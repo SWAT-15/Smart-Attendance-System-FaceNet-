@@ -1,0 +1,188 @@
+# ================================================================
+#  Smart Attendance System — Spring Boot Configuration
+#  Free Services Stack:
+#    Database  : Supabase (PostgreSQL 15 + pgvector) — FREE tier
+#    Redis     : Upstash  (Serverless Redis)          — FREE tier (10K cmd/day)
+#    Auth      : Google OAuth2                        — FREE
+#    ML Service: Local FastAPI / Railway.app           — FREE tier
+#    Frontend  : Vercel (Next.js)                     — FREE tier
+# ================================================================
+
+spring:
+  application:
+    name: smart-attendance-system
+
+  # ── Supabase PostgreSQL (Free tier — 500MB storage) ─────────
+  # Use Transaction Mode pooler (port 5432) for JPA/Hibernate
+  # Use Session Mode pooler (port 5432) if you need prepared statements
+  datasource:
+    url: ${SUPABASE_DB_URL:jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require}
+    username: ${SUPABASE_DB_USER:postgres.your_project_ref}
+    password: ${SUPABASE_DB_PASSWORD:your_supabase_db_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5       # Supabase free tier: max 5 concurrent connections
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: AttendanceHikariPool
+      # Supabase requires keep-alive to prevent idle connection drops
+      keepalive-time: 30000
+      connection-test-query: SELECT 1
+
+  # ── JPA / Hibernate ─────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: none             # Schema already applied via schema.sql in Supabase SQL Editor
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  # ── Upstash Redis (Free tier — Serverless, no self-hosting) ─
+  # Upstash provides a Redis-compatible endpoint accessible via TLS.
+  # Free tier: 10,000 commands/day, 256MB storage — perfect for QR tokens.
+  #
+  # How to get credentials:
+  #   1. Go to https://upstash.com → Create free account
+  #   2. Create Redis Database (region closest to your Supabase region)
+  #   3. Copy "Endpoint", "Port", and "Password" from the console
+  #   4. Set as environment variables below
+  data:
+    redis:
+      host: ${UPSTASH_REDIS_HOST:your-upstash-endpoint.upstash.io}
+      port: ${UPSTASH_REDIS_PORT:6379}
+      password: ${UPSTASH_REDIS_PASSWORD:your_upstash_password}
+      ssl:
+        enabled: true            # Upstash requires TLS/SSL
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 1
+          max-wait: 1000ms
+
+  # ── Google OAuth2 ─────────────────────────────────────────────
+  # Credentials from Google Cloud Console → APIs & Services → Credentials
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - openid
+              - email
+              - profile
+            # Redirect URI must EXACTLY match what you set in Google Cloud Console
+            # Format: {scheme}://{host}/auth/oauth2/callback/google
+            redirect-uri: "{baseUrl}/auth/oauth2/callback/{registrationId}"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  # ── WebSocket ─────────────────────────────────────────────────
+  websocket:
+    message-broker:
+      application-destination-prefix: /app
+      simple-broker-destinations: /topic, /queue
+
+  # ── File Upload ───────────────────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+# ── Application Custom Properties ────────────────────────────────
+app:
+  # ── JWT ─────────────────────────────────────────────────────
+  jwt:
+    # IMPORTANT: Generate a strong 32+ char random secret
+    # Run in terminal: openssl rand -base64 32
+    secret: ${JWT_SECRET:change-this-to-a-strong-32-plus-character-secret-key!!}
+    expiration-ms: 86400000         # 24 hours
+    refresh-expiration-ms: 604800000  # 7 days
+
+  # ── Security ─────────────────────────────────────────────────
+  security:
+    allowed-email-domains: ${ALLOWED_EMAIL_DOMAINS:college.edu,college.ac.in,gmail.com}
+
+  # ── Frontend URL (for OAuth2 redirects) ──────────────────────
+  # Local dev: http://localhost:3000
+  # Production: https://your-app.vercel.app
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
+  # ── QR Token (Upstash Redis) ──────────────────────────────────
+  qr:
+    token-ttl-seconds: 60          # Expires in 60 seconds (allows time for liveness detection)
+    redis-key-prefix: "qr:session:"
+
+  # ── FaceNet Microservice ──────────────────────────────────────
+  # Local dev: http://localhost:8001
+  # Free hosting: Deploy on Railway.app free tier → set FACENET_URL
+  face:
+    similarity-threshold: 0.80     # Cosine similarity >= 0.80 = MATCH
+    facenet-service-url: ${FACENET_URL:http://localhost:8001}
+
+  # ── Supabase Storage (face reference images) ──────────────────
+  # Supabase Storage is free (1GB on free tier)
+  # Create a bucket named "face-images" in Supabase Dashboard → Storage
+  supabase:
+    url: ${SUPABASE_URL:https://your_project_ref.supabase.co}
+    anon-key: ${SUPABASE_ANON_KEY:your_supabase_anon_key}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:your_service_role_key}
+    storage-bucket: face-images
+
+# ── Server ────────────────────────────────────────────────────────
+server:
+  port: ${PORT:8080}           # PORT env var used by Railway/Render free hosting
+  servlet:
+    context-path: /api
+  error:
+    include-message: always
+    include-binding-errors: always
+  # Compression for free hosting with limited bandwidth
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+
+# ── Actuator (monitoring on free hosting) ─────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never        # Don't expose DB details publicly
+
+# ── OpenAPI / Swagger UI ──────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+# ── Logging ───────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.attendance: DEBUG
+    org.springframework.security: INFO   # Switch to DEBUG if auth issues arise
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{HH:mm:ss} [%thread] %-5level %logger{30} — %msg%n"

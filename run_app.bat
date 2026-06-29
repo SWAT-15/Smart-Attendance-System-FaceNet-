@@ -1,0 +1,6 @@
+@echo off
+echo Starting database IPv4-to-IPv6 proxy in background...
+start /min "Supabase IPv6 Proxy" cmd /k python db_proxy.py
+
+echo Starting Docker containers...
+docker-compose up --build

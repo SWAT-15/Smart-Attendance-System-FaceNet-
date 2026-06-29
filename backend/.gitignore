@@ -1,0 +1,32 @@
+# ── Build outputs ────────────────────────────────────────────────
+target/
+*.jar
+*.war
+*.class
+
+# ── IDE files ─────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+.eclipse/
+.settings/
+*.project
+*.classpath
+
+# ── Environment & Secrets ─────────────────────────────────────────
+.env
+*.env
+application-local.yml
+application-prod.yml
+
+# ── Logs ─────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Maven ─────────────────────────────────────────────────────────
+.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# ── OS files ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
