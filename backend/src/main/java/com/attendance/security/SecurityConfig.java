@@ -133,10 +133,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of(
+        // Use setAllowedOriginPatterns for wildcards in Spring Boot when allowCredentials is true
+        config.setAllowedOriginPatterns(List.of(
             "http://localhost:3000",    // Next.js local dev
             "http://localhost:3001",
-            "https://*.vercel.app"      // Vercel (free) preview deployments
+            "https://*.vercel.app",     // Vercel (free) preview deployments
+            frontendUrl                 // The exact frontend URL from environment
         ));
 
         config.setAllowedMethods(Arrays.asList(
